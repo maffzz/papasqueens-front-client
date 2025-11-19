@@ -181,131 +181,274 @@ export default function Track() {
     return () => clearInterval(t)
   }, [deliveryId])
 
+  const steps = ['recibido', 'en_preparacion', 'listo_para_entrega', 'en_camino', 'entregado']
+  const rawStatus = String(order?.status || order?.estado || '').toLowerCase()
+  let derivedStatus = rawStatus
+  if (orderDetails && Array.isArray(orderDetails.history) && orderDetails.history.length > 0) {
+    const hasAccepted = orderDetails.history.some(h => {
+      const stepName = String((h && h.step) || '').toLowerCase()
+      return stepName.includes('aceptado') || stepName.includes('accepted')
+    })
+    const hasMultipleSteps = orderDetails.history.length > 1
+    if (hasAccepted || (hasMultipleSteps && rawStatus === 'recibido')) {
+      derivedStatus = 'en_preparacion'
+    }
+  }
+  const currentStatus = derivedStatus
+  const currentStepIndex = steps.findIndex(s => currentStatus.includes(s.replace('_', '')) || currentStatus === s)
+
   return (
-    <main className="container section" style={{ maxWidth: 720, margin: '0 auto' }}>
-      <h1 className="appTitle" style={{ color:'#03592e', textAlign: 'center' }}>Seguimiento de pedido</h1>
-      <form
-        onSubmit={onSubmit}
-        className="list card"
-        style={{ maxWidth: 600, margin: '1rem auto' }}
-      >
-        <input className="input" value={id} onChange={e => setId(e.target.value)} placeholder="ID de pedido" required />
-        <button className="btn primary" type="submit">Consultar</button>
-      </form>
-      <section className="section">
-        {err && <div className="card">{err}</div>}
+    <main style={{ minHeight: '100vh', background: '#f8fafc', padding: '1.5rem 1rem 2.25rem' }}>
+      <section className="container" style={{ maxWidth: 840, margin: '0 auto' }}>
+        <header style={{ textAlign: 'center', marginBottom: '1.5rem' }}>
+          <h1 className="appTitle" style={{ color:'#03592e', fontSize: '32px', marginBottom: '.25rem' }}>Seguimiento de pedido</h1>
+          <p style={{ fontSize: '13px', color: '#64748b', margin: 0 }}>
+            Ingresa el ID de tu pedido para ver en qué etapa va y revisar el historial completo.
+          </p>
+        </header>
+
+        {/* Buscador de pedido */}
+        <form
+          onSubmit={onSubmit}
+          className="card"
+          style={{ maxWidth: 640, margin: '0 auto 2rem', padding: '1.25rem 1.5rem', boxShadow: '0 12px 30px rgba(15,23,42,0.08)', borderRadius: '1rem' }}
+        >
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '.75rem'
+            }}
+          >
+            <input
+              className="input"
+              value={id}
+              onChange={e => setId(e.target.value)}
+              placeholder="ID de pedido (por ejemplo, copiado desde tus pedidos activos)"
+              required
+              style={{ textAlign: 'center', maxWidth: 500, width: '100%' }}
+            />
+            <button
+              className="btn primary"
+              type="submit"
+              style={{ height: '2.75rem', whiteSpace: 'nowrap' }}
+            >
+              Consultar
+            </button>
+          </div>
+          {err && (
+            <div style={{ marginTop: '.75rem', fontSize: '13px', color: '#b91c1c' }}>{err}</div>
+          )}
+        </form>
+
+        {/* Estado actual del pedido */}
         {order && (
-          <div className="card">
-            <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
-              <strong>Pedido #{order.id_order || order.order_id || order.id}</strong>
-              <span className="price">{formatPrice(order.total || 0)}</span>
-            </div>
-            <div style={{ margin:'.5rem 0' }}>Estado: <strong>{order.status || order.estado || 'desconocido'}</strong></div>
-            <ul className="list" style={{ paddingLeft:'1rem' }}>
-              {(order.items || []).map((i, idx) => <li key={idx}>{i.cantidad || i.qty || 1} × {i.nombre || i.name}</li>)}
-            </ul>
-            <div style={{ marginTop: '.5rem' }}>
-              <button className="btn danger" disabled={!canCancelStatus(order.status || order.estado)} onClick={(e)=>{ e.preventDefault(); if (!canCancelStatus(order.status || order.estado)) { showToast({ type:'warning', message:'Solo puedes cancelar si el estado es "recibido"' }); return } cancelOrder() }}>Cancelar pedido</button>
-              {!canCancelStatus(order.status || order.estado) && (
-                <div style={{ marginTop: '.25rem', color:'#666' }}>Solo se puede cancelar cuando el estado es <strong>recibido</strong>.</div>
-              )}
+          <div className="section" style={{ paddingTop: 0 }}>
+            <div className="card" style={{ padding: '1.5rem 1.75rem', borderRadius: '1rem', boxShadow: '0 10px 25px rgba(15,23,42,0.06)', marginBottom: '1.5rem' }}>
+              <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', gap: '1rem', marginBottom: '1rem' }}>
+                <div>
+                  <div style={{ fontSize: '13px', color: '#6b7280' }}>Pedido</div>
+                  <div style={{ fontWeight: 700, color: '#03592e' }}>#{order.id_order || order.order_id || order.id}</div>
+                </div>
+                <div style={{ textAlign: 'right' }}>
+                  <div style={{ fontSize: '13px', color: '#6b7280' }}>Monto</div>
+                  {Number(order.total || 0) === 0 ? (
+                    <div style={{ fontWeight: 700, color: '#16a34a' }}>Pagado</div>
+                  ) : (
+                    <div style={{ fontWeight: 700, color: '#03592e' }}>{formatPrice(order.total || 0)}</div>
+                  )}
+                  <div style={{ marginTop: '.35rem' }}>
+                    <span style={{
+                      fontSize: '11px',
+                      padding: '.15rem .55rem',
+                      borderRadius: '999px',
+                      border: '1px solid #16a34a',
+                      color: '#166534',
+                      background: '#dcfce7',
+                      textTransform: 'capitalize'
+                    }}>
+                      {(currentStatus || rawStatus || 'desconocido').replace(/_/g, ' ')}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Barra de progreso visual */}
+              <div style={{ margin: '1rem 0 1.25rem' }}>
+                <div style={{ display:'flex', justifyContent:'space-between', marginBottom: '.35rem' }}>
+                  {steps.map((step, idx) => {
+                    const isDone = currentStepIndex >= idx && currentStepIndex !== -1
+                    const label = step.replace(/_/g, ' ')
+                    return (
+                      <div key={step} style={{ flex: 1, textAlign:'center', fontSize: '11px', color: isDone ? '#065f46' : '#9ca3af' }}>
+                        <div
+                          style={{
+                            width: 18,
+                            height: 18,
+                            borderRadius: '999px',
+                            margin: '0 auto .25rem',
+                            border: '2px solid ' + (isDone ? '#16a34a' : '#d1d5db'),
+                            background: isDone ? '#16a34a' : '#f9fafb',
+                            display:'flex',
+                            alignItems:'center',
+                            justifyContent:'center',
+                            color: '#fff',
+                            fontSize: '11px',
+                            fontWeight: 600
+                          }}
+                        >
+                          {idx + 1}
+                        </div>
+                        <span style={{ textTransform:'capitalize' }}>{label}</span>
+                      </div>
+                    )
+                  })}
+                </div>
+                <div style={{ position:'relative', height: 3, background:'#e5e7eb', borderRadius: 999 }}>
+                  <div
+                    style={{
+                      position:'absolute',
+                      left: 0,
+                      top: 0,
+                      bottom: 0,
+                      borderRadius: 999,
+                      background:'#16a34a',
+                      width: currentStepIndex === -1 ? '0%' : `${(currentStepIndex / (steps.length - 1)) * 100}%`
+                    }}
+                  />
+                </div>
+              </div>
+
+              {/* Resumen de productos y acciones */}
+              <div style={{ display:'flex', justifyContent:'space-between', gap: '1rem', alignItems:'flex-start', flexWrap:'wrap' }}>
+                <div style={{ flex: 1, minWidth: 220 }}>
+                  <div style={{ fontSize: '13px', color:'#6b7280', marginBottom: '.25rem' }}>Detalle del pedido</div>
+                  <ul className="list" style={{ paddingLeft:'1rem' }}>
+                    {(order.items || []).map((i, idx) => (
+                      <li key={idx}>{i.cantidad || i.qty || 1} × {i.nombre || i.name}</li>
+                    ))}
+                  </ul>
+                </div>
+                <div style={{ width: 180, textAlign: 'right' }}>
+                  <button
+                    className="btn danger"
+                    style={{ width: '100%' }}
+                    disabled={!canCancelStatus(order.status || order.estado)}
+                    onClick={(e)=>{
+                      e.preventDefault()
+                      if (!canCancelStatus(order.status || order.estado)) {
+                        showToast({ type:'warning', message:'Solo puedes cancelar si el estado es "recibido"' })
+                        return
+                      }
+                      cancelOrder()
+                    }}
+                  >
+                    Cancelar pedido
+                  </button>
+                  {!canCancelStatus(order.status || order.estado) && (
+                    <div style={{ marginTop: '.35rem', color:'#6b7280', fontSize:'12px' }}>
+                      Solo se puede cancelar cuando el estado es <strong>recibido</strong>.
+                    </div>
+                  )}
+                </div>
+              </div>
             </div>
           </div>
         )}
       </section>
 
-      <section className="section">
-        <div className="card">
-          <h2 className="appTitle" style={{ marginBottom: '.5rem' }}>Historial del pedido</h2>
-          {!orderDetails ? (
-            <div>—</div>
-          ) : (
-            <div className="list">
-              {(orderDetails.history || []).length === 0 ? (
-                <div className="card">Sin eventos aún</div>
-              ) : (
-                <ul className="list">
-                  {(orderDetails.history || []).map((h, idx) => (
-                    <li key={idx} className="card" style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
-                      <div style={{ textTransform:'capitalize' }}>{String(h.step || 'evento')}</div>
-                      <div style={{ color:'#666' }}>{h.by || '—'}</div>
-                      <div style={{ color:'#666' }}>{h.at ? new Date(h.at).toLocaleString() : '—'}</div>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </div>
-          )}
-        </div>
-      </section>
+      <section className="section" style={{ marginTop: '1rem' }}>
+        <div
+          style={{
+            display: 'grid',
+            gridTemplateColumns: 'minmax(0,1.4fr) minmax(0,1fr)',
+            gap: '1.25rem',
+            alignItems: 'stretch'
+          }}
+        >
+          <div className="card" style={{ borderRadius: '1rem', height: '100%', padding: '1.25rem 1.5rem' }}>
+            <h2 className="appTitle" style={{ marginBottom: '.75rem', fontSize: '17px' }}>Historial del pedido</h2>
+            {!orderDetails ? (
+              <div style={{ fontSize: '13px', color: '#9ca3af' }}>—</div>
+            ) : (
+              <div>
+                {(orderDetails.history || []).length === 0 ? (
+                  <div style={{ fontSize: '13px', color: '#9ca3af' }}>Sin eventos aún</div>
+                ) : (
+                  <ul className="list" style={{ margin: 0 }}>
+                    {(orderDetails.history || []).map((h, idx) => (
+                      <li
+                        key={idx}
+                        style={{
+                          display: 'grid',
+                          gridTemplateColumns: 'minmax(0,0.9fr) minmax(0,1.1fr) minmax(0,1fr)',
+                          alignItems: 'center',
+                          fontSize: '13px',
+                          padding: '.45rem .75rem',
+                          borderRadius: '999px',
+                          background: idx % 2 === 0 ? '#f9fafb' : '#f3f4f6',
+                          marginBottom: '.35rem'
+                        }}
+                      >
+                        <div style={{ textTransform: 'capitalize', fontWeight: 600 }}>{String(h.step || 'evento')}</div>
+                        <div style={{ color: '#6b7280', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{h.by || '—'}</div>
+                        <div style={{ color: '#6b7280', textAlign: 'right' }}>{h.at ? new Date(h.at).toLocaleString() : '—'}</div>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            )}
+          </div>
 
-      <section className="section">
-        <div className="card">
-          <h2 className="appTitle" style={{ marginBottom: '.5rem' }}>Workflow (detalle)</h2>
-          {!orderDetails ? (
-            <div>—</div>
-          ) : (
-            <div className="list">
-              <div>
-                <strong>Cocina</strong>
-                <pre style={{ whiteSpace:'pre-wrap' }}>{JSON.stringify((orderDetails.workflow||{}).kitchen || {}, null, 2)}</pre>
-              </div>
-              <div>
-                <strong>Delivery</strong>
-                <pre style={{ whiteSpace:'pre-wrap' }}>{JSON.stringify((orderDetails.workflow||{}).delivery || {}, null, 2)}</pre>
-              </div>
-            </div>
-          )}
+          <div className="card" style={{ borderRadius: '1rem', height: '100%', padding: '1.25rem 1.5rem' }}>
+            <h2 className="appTitle" style={{ marginBottom: '.75rem', fontSize: '17px' }}>Detalle del delivery</h2>
+            {!orderDetails ? (
+              <div style={{ fontSize: '13px', color: '#9ca3af' }}>—</div>
+            ) : (
+              (() => {
+                const delivery = (orderDetails.workflow || {}).delivery || {}
+                const dStatus = delivery.status || '—'
+                const dStart = delivery.start_time ? new Date(delivery.start_time).toLocaleString() : '—'
+                const dEnd = delivery.end_time ? new Date(delivery.end_time).toLocaleString() : '—'
+                const dStaff = delivery.id_delivery || delivery.assigned_to || '—'
+                return (
+                  <dl style={{ fontSize: '13px', color: '#4b5563', display: 'grid', rowGap: '.35rem', margin: 0 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', gap: '.75rem', paddingBottom: '.2rem', borderBottom: '1px dashed #e5e7eb' }}>
+                      <dt style={{ fontWeight: 600 }}>Estado</dt>
+                      <dd style={{ margin: 0, textTransform: 'capitalize' }}>{dStatus}</dd>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', gap: '.75rem' }}>
+                      <dt style={{ fontWeight: 600 }}>Inicio</dt>
+                      <dd style={{ margin: 0 }}>{dStart}</dd>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', gap: '.75rem' }}>
+                      <dt style={{ fontWeight: 600 }}>Fin</dt>
+                      <dd style={{ margin: 0 }}>{dEnd}</dd>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', gap: '.75rem' }}>
+                      <dt style={{ fontWeight: 600 }}>Reparto / ID</dt>
+                      <dd style={{ margin: 0 }}>{dStaff}</dd>
+                    </div>
+                  </dl>
+                )
+              })()
+            )}
+          </div>
         </div>
       </section>
 
       <section className="section">
         <div className="card">
           <h2 className="appTitle" style={{ marginBottom: '.5rem' }}>Seguimiento del repartidor</h2>
-          <form onSubmit={(e) => { e.preventDefault(); if (deliveryId) fetchTrack(deliveryId) }} className="list">
-            <input className="input" value={deliveryId} onChange={e => setDeliveryId(e.target.value)} placeholder="ID de delivery (si lo tienes)" />
-            <button className="btn" type="submit">Actualizar</button>
-          </form>
-          <div id="cust-track-view" className="list" style={{ marginTop: '.75rem' }}></div>
+          <p style={{ fontSize: '13px', color: '#6b7280', marginBottom: '.75rem' }}>
+            Cuando tu pedido esté en camino verás aquí la ruta aproximada del repartidor.
+          </p>
+          <div id="cust-track-view" className="list" style={{ marginBottom: '.75rem' }}></div>
           <div id="cust-map" className="map"></div>
-          <div className="list" style={{ marginTop: '.75rem' }}>
-            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'.5rem' }}>
-              <input id="cust-eta-lat" className="input" placeholder="Destino lat" onInput={calcEta} />
-              <input id="cust-eta-lng" className="input" placeholder="Destino lng" onInput={calcEta} />
-            </div>
-            <div style={{ display:'flex', gap:'.5rem', alignItems:'center' }}>
-              <input id="cust-eta-speed" className="input" defaultValue="25" placeholder="Velocidad km/h (default 25)" onInput={calcEta} />
-              <button className="btn" onClick={(e)=>{ e.preventDefault(); calcEta() }}>Recalcular</button>
-            </div>
-            <div id="cust-eta-view" style={{ color:'#666' }}>ETA ~ —</div>
-          </div>
         </div>
       </section>
-
-      <section className="section">
-        <div className="card">
-          <h2 className="appTitle" style={{ marginBottom: '.5rem' }}>Mis pedidos (por ID de cliente)</h2>
-          <form onSubmit={fetchCustomerOrders} className="list">
-            <input className="input" value={custId} onChange={e=>setCustId(e.target.value)} placeholder="ID cliente / teléfono" />
-            <button className="btn" type="submit">Buscar</button>
-          </form>
-          <div className="list" style={{ marginTop: '.5rem' }}>
-            {custOrders.length === 0 ? <div className="card">Sin resultados</div> : (
-              <div className="list">
-                {custOrders.map(o => (
-                  <div key={o.id_order || o.id} className="card" style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
-                    <div>
-                      <div><strong>#{o.id_order || o.id}</strong> — {o.status || o.estado}</div>
-                      <div className="price">{formatPrice(o.total || 0)}</div>
-                    </div>
-                    <button className="btn" onClick={()=>{ setId(String(o.id_order || o.id)); fetchOrder(String(o.id_order || o.id)) }}>Ver</button>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        </div>
-      </section>
-    </main>
+  </main>
   )
 }

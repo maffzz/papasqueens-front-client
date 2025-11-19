@@ -65,59 +65,7 @@ export default function CustomerHeader() {
                 />
               </div>
             </Link>
-            
-            <div ref={categoriesRef} style={{ position: 'relative' }}>
-              <button
-                className="btn"
-                onClick={(e) => {
-                  e.preventDefault()
-                  setShowCategories(!showCategories)
-                }}
-                style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}
-              >
-                ☰ Categorías {selectedCategory && `(${selectedCategory})`}
-              </button>
-              {showCategories && (
-                <div style={{
-                  position: 'absolute',
-                  top: '100%',
-                  left: '0',
-                  background: '#fff',
-                  border: '1px solid #ddd',
-                  borderRadius: '8px',
-                  boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
-                  zIndex: 1000,
-                  minWidth: '200px'
-                }}>
-                  {categories.map(cat => (
-                    <button
-                      key={cat}
-                      className="btn"
-                      onClick={() => {
-                        setSelectedCategory(cat === 'Todos' ? '' : cat)
-                        setShowCategories(false)
-                        nav(`/menu${cat === 'Todos' ? '' : '?category=' + encodeURIComponent(cat)}`)
-                      }}
-                      style={{
-                        display: 'block',
-                        width: '100%',
-                        padding: '0.75rem 1rem',
-                        border: 'none',
-                        background: selectedCategory === (cat === 'Todos' ? '' : cat) ? '#f0f0f0' : '#fff',
-                        textAlign: 'left',
-                        cursor: 'pointer',
-                        fontSize: '14px'
-                      }}
-                      onMouseEnter={(e) => e.currentTarget.style.background = '#f5f5f5'}
-                      onMouseLeave={(e) => e.currentTarget.style.background = selectedCategory === (cat === 'Todos' ? '' : cat) ? '#f0f0f0' : '#fff'}
-                    >
-                      {cat}
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-            
+
             <div ref={localesRef} style={{ position: 'relative' }}>
               <button
                 className="btn"

@@ -75,6 +75,10 @@ export default function Menu() {
       nav('/login')
       return
     }
+    const ok = window.confirm('Pagar ahora (solo pago web).\n\nAl aceptar crearemos tu pedido con pago web registrado.')
+    if (!ok) {
+      return
+    }
     const tenant_id = getTenantId()
     if (!tenant_id) {
       alert('Error: No se encontró tenant_id. Por favor recarga la página.')
