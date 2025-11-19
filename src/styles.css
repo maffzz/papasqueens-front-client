@@ -1,0 +1,156 @@
+@import url('https://fonts.googleapis.com/css?family=Staatliches&display=fallback');
+@import url('https://tofuu.getjusto.com/orioneat-prod/CircularStd-Book.css');
+@import url('https://unpkg.com/leaflet@1.9.4/dist/leaflet.css');
+
+:root {
+  --background: 0 0% 100%;
+  --foreground: 0 0% 0%;
+  --primary: 146.2069 100% 17.0588%;
+  --primary-foreground: 0 0% 100%;
+  --muted: 0 0% 96.1%;
+  --muted-foreground: 0 0% 45.1%;
+  --accent: 0 0% 96.1%;
+  --accent-foreground: 0 0% 9%;
+  --success: 142 76% 36%;
+  --warning: 45 93% 47%;
+  --danger: 0 84% 60%;
+  --radius: 12px;
+}
+
+html, body, #root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  font-family: 'CircularStd-Book', sans-serif;
+  color: #03592E;
+  background: hsl(var(--background));
+  min-height: 100vh;
+}
+
+.appTitle {
+  font-family: 'Staatliches', sans-serif;
+  letter-spacing: 2px;
+}
+
+.container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 1rem;
+  width: 100%;
+}
+
+.header {
+  position: sticky;
+  top: 0;
+  background: #fff;
+  border-bottom: 1px solid #eee;
+  min-height: 64px;
+  display: flex;
+  align-items: center;
+  z-index: 10;
+  width: 100%;
+}
+
+.nav {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  width: 100%;
+}
+
+.logo {
+  height: 48px;
+}
+
+.section {
+  padding: 2rem 0;
+}
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: .5rem;
+  height: 2.25rem;
+  padding: 0 .9rem;
+  border-radius: var(--radius);
+  border: 1px solid #e5e7eb;
+  background: transparent;
+  color: #03592E;
+  cursor: pointer;
+  transition: background-color .15s ease;
+}
+
+.btn.primary {
+  background: hsl(var(--primary));
+  color: hsl(var(--primary-foreground));
+  border-color: hsl(var(--primary));
+}
+
+.btn.primary:hover {
+  filter: brightness(0.95);
+}
+
+.btn.ghost {
+  background: #fff;
+}
+
+.btn.success {
+  background: hsl(var(--success));
+  color: #fff;
+  border-color: hsl(var(--success));
+}
+
+.btn.warning {
+  background: hsl(var(--warning));
+  color: #fff;
+  border-color: hsl(var(--warning));
+}
+
+.btn.danger {
+  background: hsl(var(--danger));
+  color: #fff;
+  border-color: hsl(var(--danger));
+}
+
+.input {
+  height: 2.5rem;
+  padding: 0 .75rem;
+  border: 1px solid #e5e7eb;
+  border-radius: .5rem;
+  width: 100%;
+}
+
+.card {
+  background: #fff;
+  border: 1px solid rgba(0,0,0,.08);
+  border-radius: var(--radius);
+  padding: 1rem;
+}
+
+.grid {
+  display: grid;
+  gap: 1rem;
+}
+
+.price {
+  font-weight: 600;
+  color: hsl(var(--primary));
+}
+
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: .75rem;
+}
+
+/* Map */
+.map {
+  height: 360px;
+  border: 1px solid rgba(0,0,0,.08);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
