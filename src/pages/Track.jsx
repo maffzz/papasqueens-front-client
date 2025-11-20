@@ -324,11 +324,28 @@ export default function Track() {
               <div style={{ display:'flex', justifyContent:'space-between', gap: '1rem', alignItems:'flex-start', flexWrap:'wrap' }}>
                 <div style={{ flex: 1, minWidth: 220 }}>
                   <div style={{ fontSize: '13px', color:'#6b7280', marginBottom: '.25rem' }}>Detalle del pedido</div>
-                  <ul className="list" style={{ paddingLeft:'1rem' }}>
-                    {(order.items || []).map((i, idx) => (
-                      <li key={idx}>{i.cantidad || i.qty || 1} × {i.nombre || i.name}</li>
-                    ))}
-                  </ul>
+                  {(() => {
+                    const items = (orderDetails && Array.isArray(orderDetails.items) && orderDetails.items.length)
+                      ? orderDetails.items
+                      : (order.items || [])
+                    if (!items.length) {
+                      return <div style={{ fontSize: '13px', color:'#9ca3af' }}>Sin detalle disponible para este pedido.</div>
+                    }
+                    return (
+                      <ul className="list" style={{ paddingLeft:'1rem' }}>
+                        {items.map((i, idx) => (
+                          <li key={idx}>
+                            {i.cantidad || i.qty || 1} × {i.nombre || i.name}
+                            {typeof i.precio === 'number' && (
+                              <span style={{ marginLeft: '.35rem', color:'#6b7280' }}>
+                                ({formatPrice(i.precio)})
+                              </span>
+                            )}
+                          </li>
+                        ))}
+                      </ul>
+                    )
+                  })()}
                 </div>
                 <div style={{ width: 180, textAlign: 'right' }}>
                   <button

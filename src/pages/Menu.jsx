@@ -88,6 +88,12 @@ export default function Menu() {
       id_customer: auth.id,
       tenant_id,
       list_id_products: cart.map(x => x.id_producto).filter(Boolean),
+      items: cart.map(x => ({
+        id_producto: x.id_producto,
+        nombre: x.nombre,
+        precio: x.precio,
+        qty: x.qty || 1,
+      })),
     }
     if (!payload.list_id_products.length) {
       alert('Error: No hay productos válidos en el carrito')

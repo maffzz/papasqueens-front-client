@@ -138,17 +138,6 @@ export default function CustomerHeader() {
           </div>
           
           <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-            <button
-              className="btn"
-              onClick={(e) => {
-                e.preventDefault()
-                const search = prompt('Buscar producto (próximamente)')
-                if (search) nav(`/menu?search=${encodeURIComponent(search)}`)
-              }}
-              title="Buscar"
-            >
-              🔍
-            </button>
             {isLoggedIn ? (
               <button
                 className="btn"

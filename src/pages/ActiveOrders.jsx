@@ -105,11 +105,16 @@ export default function ActiveOrders() {
             }
 
             const statusLabel = (rawStatus || 'recibido').replace(/_/g, ' ')
+            const isCancelled = statusLabel.toLowerCase().includes('cancelado')
 
             return (
               <div key={id} className="card" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <div>
-                  <div><strong>#{id}</strong> — {statusLabel}</div>
+                  <div>
+                    <strong>#{id}</strong>
+                    {' — '}
+                    <span style={{ color: isCancelled ? '#b91c1c' : '#111827' }}>{statusLabel}</span>
+                  </div>
                   {total === 0 ? (
                     <div style={{ fontWeight: '600', color: '#16a34a' }}>Pagado</div>
                   ) : (
