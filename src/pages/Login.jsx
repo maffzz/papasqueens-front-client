@@ -67,6 +67,11 @@ export default function Login() {
               <p style={{ fontSize: '13px', color: '#64748b', margin: 0 }}>
                 Ingresa con tu cuenta para ver tu historial de pedidos y hacer nuevos pedidos más rápido.
               </p>
+              <div style={{ marginTop: '.75rem', fontSize: '12px', color: '#b45309', background: '#fffbeb', border: '1px solid #facc15', borderRadius: '0.5rem', padding: '0.5rem 0.75rem', textAlign: 'left' }}>
+                <strong>Importante:</strong> Antes de ingresar, asegúrate de seleccionar tu zona de pedido
+                (botón "
+                <span style={{ whiteSpace: 'nowrap' }}>📍 ¿Dónde quieres pedir?</span>"). Esto define desde qué sede se procesan tus pedidos.
+              </div>
             </header>
 
             <form onSubmit={onSubmit} className="list">
