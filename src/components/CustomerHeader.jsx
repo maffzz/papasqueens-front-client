@@ -142,10 +142,7 @@ export default function CustomerHeader() {
               <button
                 className="btn"
                 onClick={() => {
-                  if (window.confirm('¿Quieres cerrar sesión?')) {
-                    logout()
-                    nav('/')
-                  }
+                  nav('/account')
                 }}
                 style={{ padding: '0.5rem' }}
               >

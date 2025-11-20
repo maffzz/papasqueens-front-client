@@ -28,7 +28,36 @@ async function api(path, opts = {}) {
   const res = await fetch(url, Object.assign({}, opts, { headers }))
   if (!res.ok) {
     // En app de cliente, NO redirigimos a /login en 401/403
-    throw new Error(await res.text())
+    let text
+    try {
+      text = await res.text()
+    } catch {
+      text = ''
+    }
+
+    let message = text || `Error HTTP ${res.status}`
+    // Intentar extraer mensaje legible desde JSON
+    const idx = text.indexOf('{')
+    if (idx !== -1) {
+      const jsonPart = text.slice(idx).trim()
+      if (jsonPart.startsWith('{')) {
+        try {
+          let parsed = JSON.parse(jsonPart)
+          if (typeof parsed === 'string' && parsed.trim().startsWith('{')) {
+            try { parsed = JSON.parse(parsed.trim()) } catch {}
+          }
+          if (parsed && typeof parsed.error === 'string') {
+            message = parsed.error
+          } else if (parsed && typeof parsed.message === 'string') {
+            message = parsed.message
+          }
+        } catch {
+          // dejamos message como estaba
+        }
+      }
+    }
+
+    throw new Error(message)
   }
   const ct = res.headers.get('content-type') || ''
   return ct.includes('application/json') ? res.json() : res.text()

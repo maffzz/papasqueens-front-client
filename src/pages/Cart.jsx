@@ -341,12 +341,50 @@ export default function Cart() {
                 </div>
               )}
 
+              {auth?.id && !((auth.address && String(auth.address).trim()) || (auth.direccion && String(auth.direccion).trim())) && (
+                <div style={{ 
+                  padding: '1rem', 
+                  background: '#fee2e2', 
+                  borderRadius: '8px', 
+                  marginBottom: '1rem',
+                  border: '1px solid #fca5a5'
+                }}>
+                  <strong style={{ color: '#b91c1c' }}>
+                    ⚠️ Debes registrar tu dirección para poder crear un pedido
+                  </strong>
+                  <button
+                    onClick={() => nav('/account')}
+                    style={{
+                      width: '100%',
+                      marginTop: '0.5rem',
+                      background: '#b91c1c',
+                      color: '#fff',
+                      border: 'none',
+                      padding: '0.75rem',
+                      borderRadius: '8px',
+                      fontSize: '16px',
+                      fontWeight: '600',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    Ir a Mi cuenta
+                  </button>
+                </div>
+              )}
+
               <button
                 onClick={() => nav('/menu')}
-                disabled={!auth?.id || !items.length}
+                disabled={
+                  !auth?.id ||
+                  !items.length ||
+                  !((auth?.address && String(auth.address).trim()) || (auth?.direccion && String(auth.direccion).trim()))
+                }
                 style={{
                   width: '100%',
-                  background: auth?.id && items.length ? '#03592e' : '#9ca3af',
+                  background:
+                    auth?.id && items.length && ((auth?.address && String(auth.address).trim()) || (auth?.direccion && String(auth.direccion).trim()))
+                      ? '#03592e'
+                      : '#9ca3af',
                   color: '#fff',
                   border: 'none',
                   padding: '0.75rem',
@@ -357,7 +395,13 @@ export default function Cart() {
                   marginBottom: '0.75rem'
                 }}
               >
-                {!auth?.id ? 'Inicia sesión primero' : items.length ? 'Continuar con el pedido' : 'Carrito vacío'}
+                {!auth?.id
+                  ? 'Inicia sesión primero'
+                  : !items.length
+                    ? 'Carrito vacío'
+                    : !((auth?.address && String(auth.address).trim()) || (auth?.direccion && String(auth.direccion).trim()))
+                      ? 'Completa tu dirección en Mi cuenta'
+                      : 'Continuar con el pedido'}
               </button>
 
               <button

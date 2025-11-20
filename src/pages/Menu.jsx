@@ -75,6 +75,12 @@ export default function Menu() {
       nav('/login')
       return
     }
+    const hasAddress = (auth?.address && String(auth.address).trim()) || (auth?.direccion && String(auth.direccion).trim())
+    if (!hasAddress) {
+      alert('Debes registrar tu dirección en "Mi cuenta" antes de crear un pedido.')
+      nav('/account')
+      return
+    }
     const ok = window.confirm('Pagar ahora (solo pago web).\n\nAl aceptar crearemos tu pedido con pago web registrado.')
     if (!ok) {
       return
@@ -94,6 +100,7 @@ export default function Menu() {
         precio: x.precio,
         qty: x.qty || 1,
       })),
+      delivery_address: auth.address || auth.direccion || undefined,
     }
     if (!payload.list_id_products.length) {
       alert('Error: No hay productos válidos en el carrito')
@@ -114,9 +121,25 @@ export default function Menu() {
       }
     } catch (e) {
       console.error('Error al crear pedido:', e)
-      const errorMsg = e.message || 'No se pudo crear el pedido'
-      showToast({ type: 'error', message: `Error: ${errorMsg}` })
-      alert(`Error: ${errorMsg}`)
+
+      const raw = e && e.message ? String(e.message) : 'No se pudo crear el pedido'
+
+      // Caso especial: dirección requerida, ignoramos el texto feo y mostramos uno fijo
+      if (raw.toLowerCase().includes('direccion de entrega requerida')) {
+        showToast({
+          type: 'error',
+          message: 'Debes completar tu dirección de entrega en "Mi cuenta" antes de crear un pedido.',
+        })
+        return
+      }
+
+      // Resto de errores: mostrar tal cual, pero sin el prefijo "Error: " si existe
+      let friendly = raw
+      if (friendly.startsWith('Error: ')) {
+        friendly = friendly.slice(7)
+      }
+
+      showToast({ type: 'error', message: friendly })
     }
   }
 

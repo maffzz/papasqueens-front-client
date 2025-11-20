@@ -12,6 +12,7 @@ import Cart from './pages/Cart'
 import ActiveOrders from './pages/ActiveOrders'
 import NotFound from './pages/NotFound'
 import ServerError from './pages/ServerError'
+import Account from './pages/Account'
 
 export default function App() {
   return (
@@ -27,6 +28,7 @@ export default function App() {
             <Route path="/login" element={<Login />} />
             <Route path="/cart" element={<Cart />} />
             <Route path="/orders" element={<ActiveOrders />} />
+            <Route path="/account" element={<Account />} />
             <Route path="/oops" element={<ServerError />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
