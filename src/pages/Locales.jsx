@@ -3,13 +3,13 @@ import { useMemo } from 'react'
 export default function Locales() {
   const locales = useMemo(() => ([
     {
-      id: 'kennedy',
-      title: 'SEDE KENNEDY',
-      district: 'Miraflores',
-      address: 'Calle Mártir José Olaya 201, Miraflores, Perú',
-      phone: '+51 955 478 937',
+      id: 'barranco',
+      title: 'SEDE BARRANCO (UTEC)',
+      district: 'Barranco',
+      address: 'Jr. Medrano Silva 165, Barranco, Lima, Perú',
+      phone: '+51 922 972 069',
       schedule: 'Lunes a Domingo\n11:00 — 22:00',
-      mapsUrl: 'https://www.google.com/maps?q=Calle+M%C3%A1rtir+Jos%C3%A9+Olaya+201,+Miraflores,+Per%C3%BA'
+      mapsUrl: 'https://www.google.com/maps?q=Universidad+de+Ingenier%C3%ADa+y+Tecnolog%C3%ADa+UTEC'
     },
     {
       id: 'puruchuco',
