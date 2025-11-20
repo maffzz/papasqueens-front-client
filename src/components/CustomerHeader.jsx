@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { useCart } from '../context/CartContext'
+import { setTenantId, getTenantId } from '../api/client'
 
 export default function CustomerHeader() {
   const { auth, logout } = useAuth()
@@ -17,6 +18,23 @@ export default function CustomerHeader() {
   const [selectedLocal, setSelectedLocal] = useState('')
   const [showLocales, setShowLocales] = useState(false)
   const localesRef = useRef(null)
+
+  const tenantLocales = [
+    { label: 'Barranco (UTEC)', tenantId: 'tenant_pq_barranco' },
+    { label: 'Puruchuco', tenantId: 'tenant_pq_puruchuco' },
+    { label: 'Villa María', tenantId: 'tenant_pq_villamaria' },
+    { label: 'Jirón de la Unión', tenantId: 'tenant_pq_jiron' },
+  ]
+
+  useEffect(() => {
+    try {
+      const current = getTenantId && getTenantId()
+      const found = tenantLocales.find(t => t.tenantId === current)
+      if (found) setSelectedLocal(found.label)
+    } catch {
+      // ignorar errores de lectura
+    }
+  }, [])
 
   useEffect(() => {
     const handleClickOutside = (event) => {
@@ -89,12 +107,13 @@ export default function CustomerHeader() {
                   zIndex: 1000,
                   minWidth: '200px'
                 }}>
-                  {['Lima', 'Barranco', 'Miraflores'].map(local => (
+                  {tenantLocales.map(({ label, tenantId }) => (
                     <button
-                      key={local}
+                      key={tenantId}
                       className="btn"
                       onClick={() => {
-                        setSelectedLocal(local)
+                        setSelectedLocal(label)
+                        try { setTenantId && setTenantId(tenantId) } catch {}
                         setShowLocales(false)
                       }}
                       style={{
@@ -102,15 +121,15 @@ export default function CustomerHeader() {
                         width: '100%',
                         padding: '0.75rem 1rem',
                         border: 'none',
-                        background: selectedLocal === local ? '#f0f0f0' : '#fff',
+                        background: selectedLocal === label ? '#f0f0f0' : '#fff',
                         textAlign: 'left',
                         cursor: 'pointer',
                         fontSize: '14px'
                       }}
                       onMouseEnter={(e) => e.currentTarget.style.background = '#f5f5f5'}
-                      onMouseLeave={(e) => e.currentTarget.style.background = selectedLocal === local ? '#f0f0f0' : '#fff'}
+                      onMouseLeave={(e) => e.currentTarget.style.background = selectedLocal === label ? '#f0f0f0' : '#fff'}
                     >
-                      {local}
+                      {label}
                     </button>
                   ))}
                 </div>
@@ -144,7 +163,22 @@ export default function CustomerHeader() {
                 👤
               </button>
             ) : (
-              <Link className="btn" to="/login" style={{ padding: '0.5rem' }}>→</Link>
+              <button
+                className="btn"
+                style={{ padding: '0.5rem' }}
+                onClick={() => {
+                  const current = getTenantId && getTenantId()
+                  const hasTenant = !!(current && tenantLocales.find(t => t.tenantId === current))
+                  if (!hasTenant) {
+                    setShowLocales(true)
+                    alert('Primero selecciona dónde quieres pedir para continuar.')
+                    return
+                  }
+                  nav('/login')
+                }}
+              >
+                →
+              </button>
             )}
             <button
               className="btn"
