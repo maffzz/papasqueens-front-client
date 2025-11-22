@@ -1,5 +1,4 @@
-const API_BASE = 'https://id8sfymfb7.execute-api.us-east-1.amazonaws.com/dev'
-
+const API_BASE = 'https://dl34hj7opa.execute-api.us-east-1.amazonaws.com/dev'
 function getAuth() { try { return JSON.parse(localStorage.getItem('auth') || '{}') } catch { return {} } }
 function setAuth(a) { localStorage.setItem('auth', JSON.stringify(a || {})) }
 
