@@ -39,6 +39,10 @@ export default function ActiveOrders() {
               const rawStatus = String(orderDetails.status || orderDetails.estado || base.status || base.estado || '').toLowerCase()
               let derivedStatus = rawStatus
 
+              const delivery = (orderDetails.workflow || {}).delivery || {}
+              const deliveryStatusRaw = String(delivery.status || delivery.estado || '').toLowerCase()
+              const deliveryStatus = deliveryStatusRaw.replace(/_/g, ' ').trim()
+
               if (stepsHistory.length > 0) {
                 const hasDelivered = stepsHistory.some(h => String(h.step || '').toLowerCase().includes('entregado'))
                 const hasOutForDelivery = stepsHistory.some(h => {
@@ -63,7 +67,38 @@ export default function ActiveOrders() {
                 }
               }
 
+              // Ajustar con el estado de delivery si es más avanzado (sin bajar estados ya entregados)
+              if (deliveryStatus) {
+                const ds = String(derivedStatus || '').toLowerCase()
+                const isDeliveredLike = ds.includes('entregado') || ds.includes('delivered')
+                if (!isDeliveredLike) {
+                  const dsNorm = deliveryStatus.replace(/\s+/g, ' ')
+                  if (
+                    dsNorm.includes('en camino') ||
+                    dsNorm.includes('encamino') ||
+                    dsNorm.includes('onroute') ||
+                    dsNorm.includes('on route')
+                  ) {
+                    derivedStatus = 'en_camino'
+                  } else if (dsNorm.includes('listo para entrega') || dsNorm.includes('assigned')) {
+                    // Solo subir hasta listo_para_entrega si aún estamos en estados más tempranos
+                    if (!ds || ds === 'recibido' || ds === 'en_preparacion') {
+                      derivedStatus = 'listo_para_entrega'
+                    }
+                  }
+                }
+              }
+
               const customerConfirmed = !!orderDetails.customer_confirmed_delivered
+
+              // Si el cliente ya confirmó entrega, forzamos el estado a 'entregado'
+              // aunque por algún motivo el history aún no tenga el paso explícito.
+              if (customerConfirmed) {
+                const ds = String(derivedStatus || '').toLowerCase()
+                if (!ds.includes('entregado') && !ds.includes('delivered')) {
+                  derivedStatus = 'entregado'
+                }
+              }
               const itemsForRepeat = Array.isArray(orderDetails.items) ? orderDetails.items : []
 
               return {
@@ -140,21 +175,8 @@ export default function ActiveOrders() {
                 const id = o.id_order || o.id
                 const total = Number(o.total || 0)
 
-                // Estado base
-                let rawStatus = String(o._currentStatus || o.status || o.estado || '').toLowerCase()
-
-                // Derivación similar a Track.jsx usando history
-                if (Array.isArray(o.history) && o.history.length > 0) {
-                  const hasAccepted = o.history.some(h => {
-                    const stepName = String((h && h.step) || '').toLowerCase()
-                    return stepName.includes('aceptado') || stepName.includes('accepted')
-                  })
-                  const hasMultipleSteps = o.history.length > 1
-                  if (hasAccepted || (hasMultipleSteps && rawStatus === 'recibido')) {
-                    rawStatus = 'en_preparacion'
-                  }
-                }
-
+                // Usar directamente el estado derivado que ya calculamos al enriquecer (incluye kitchen + delivery + confirmaciones)
+                const rawStatus = String(o._currentStatus || o.status || o.estado || '').toLowerCase()
                 const statusLabel = (rawStatus || 'recibido').replace(/_/g, ' ')
                 const isCancelled = statusLabel.toLowerCase().includes('cancelado')
 

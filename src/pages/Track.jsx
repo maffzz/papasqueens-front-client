@@ -1,9 +1,16 @@
 import React, { useEffect, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { api, formatPrice, haversine, formatDuration } from '../api/client'
+import { api, formatPrice, haversine, formatDuration, getTenantId } from '../api/client'
 import { useToast } from '../context/ToastContext'
 import { useAuth } from '../context/AuthContext'
 import L from 'leaflet'
+
+const TENANT_ORIGINS = {
+  tenant_pq_barranco: { lat: -12.1372, lng: -77.0220 },
+  tenant_pq_puruchuco: { lat: -12.0325, lng: -76.9302 },
+  tenant_pq_vmt: { lat: -12.1630, lng: -76.9635 },
+  tenant_pq_jiron: { lat: -12.0560, lng: -77.0370 },
+}
 
 export default function Track() {
   const [sp] = useSearchParams()
@@ -17,6 +24,7 @@ export default function Track() {
   const mapRef = useRef(null)
   const markerRef = useRef(null)
   const polyRef = useRef(null)
+  const routeRef = useRef(null)
   const lastPointRef = useRef(null)
   const { showToast } = useToast()
   const { auth } = useAuth()
@@ -140,16 +148,17 @@ export default function Track() {
     const wrap = document.getElementById('cust-track-view')
     if (!t) { wrap.innerHTML = '<div className="card">Sin datos</div>'; return }
     const points = Array.isArray(t) ? t : (t.points || [])
-    const last = points[points.length - 1]
-    lastPointRef.current = last || null
-    wrap.innerHTML = `<div class="card"><div><strong>Ruta del repartidor</strong> (${points.length} puntos)</div></div>`
+    const validPoints = points.filter(p => p && typeof p.lat === 'number' && isFinite(p.lat) && typeof p.lng === 'number' && isFinite(p.lng))
+    const last = validPoints[validPoints.length - 1] || null
+    lastPointRef.current = last
+    wrap.innerHTML = `<div class="card"><div><strong>Ruta del repartidor</strong></div></div>`
 
     if (!mapRef.current) {
       mapRef.current = L.map('cust-map').setView(last ? [last.lat, last.lng] : [-12.0464, -77.0428], 13)
       L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '&copy; OpenStreetMap' }).addTo(mapRef.current)
     }
     const map = mapRef.current
-    const latlngs = points.filter(p => typeof p.lat === 'number' && typeof p.lng === 'number').map(p => [p.lat, p.lng])
+    const latlngs = validPoints.map(p => [p.lat, p.lng])
     if (polyRef.current) { map.removeLayer(polyRef.current); polyRef.current = null }
     if (latlngs.length) {
       polyRef.current = L.polyline(latlngs, { color: '#03592e' }).addTo(map)
@@ -158,6 +167,30 @@ export default function Track() {
     if (markerRef.current) { map.removeLayer(markerRef.current); markerRef.current = null }
     if (last && typeof last.lat === 'number' && typeof last.lng === 'number') {
       markerRef.current = L.marker([last.lat, last.lng]).addTo(map)
+    }
+
+    // Línea origen–destino (local -> dirección del cliente), igual que en Delivery (staff)
+    const tenantId = getTenantId()
+    const origin = TENANT_ORIGINS[tenantId]
+    const destLatRaw = orderDetails && (orderDetails.dest_lat ?? orderDetails.destLat)
+    const destLngRaw = orderDetails && (orderDetails.dest_lng ?? orderDetails.destLng)
+    const destLat = destLatRaw != null ? Number(destLatRaw) : null
+    const destLng = destLngRaw != null ? Number(destLngRaw) : null
+
+    if (origin && isFinite(destLat) && isFinite(destLng)) {
+      const routeLatLngs = [
+        [origin.lat, origin.lng],
+        [destLat, destLng],
+      ]
+      if (routeRef.current) { map.removeLayer(routeRef.current); routeRef.current = null }
+      routeRef.current = L.polyline(routeLatLngs, { color: '#0ea5e9', dashArray: '6 4' }).addTo(map)
+      // Si aún no hay puntos de tracking, ajustamos vista a la ruta origen-destino
+      if (!latlngs.length) {
+        map.fitBounds(routeRef.current.getBounds(), { padding: [20, 20] })
+      }
+    } else if (routeRef.current) {
+      map.removeLayer(routeRef.current)
+      routeRef.current = null
     }
   }
 
@@ -454,8 +487,75 @@ export default function Track() {
               (() => {
                 const delivery = (orderDetails.workflow || {}).delivery || {}
                 const dStatus = delivery.status || '—'
-                const dStart = delivery.start_time ? new Date(delivery.start_time).toLocaleString() : '—'
-                const dEnd = delivery.end_time ? new Date(delivery.end_time).toLocaleString() : '—'
+                const createdRaw = orderDetails.created_at
+                // Momento en que el local asigna el delivery al repartidor (salida a reparto lógica)
+                const startRaw = delivery.assigned_at || delivery.tiempo_salida || delivery.start_time
+                const endRaw = delivery.tiempo_llegada || delivery.end_time
+                const customerConfirmedRaw = orderDetails.customer_confirmed_at
+
+                // ETA y distancia calculados dinámicamente con la misma lógica base que calcEta
+                const last = lastPointRef.current
+                const destLatRaw = orderDetails.dest_lat ?? orderDetails.destLat
+                const destLngRaw = orderDetails.dest_lng ?? orderDetails.destLng
+                let etaSeconds = null
+                let distanceKm = null
+                if (destLatRaw != null && destLngRaw != null) {
+                  const destLat = Number(destLatRaw)
+                  const destLng = Number(destLngRaw)
+                  if (isFinite(destLat) && isFinite(destLng)) {
+                    // Punto de partida para el ETA: último tracking si existe, sino sucursal
+                    let fromLat = null
+                    let fromLng = null
+                    if (last && typeof last.lat === 'number' && typeof last.lng === 'number') {
+                      fromLat = last.lat
+                      fromLng = last.lng
+                    } else {
+                      const tenantId = getTenantId()
+                      const origin = TENANT_ORIGINS[tenantId]
+                      if (origin) {
+                        fromLat = origin.lat
+                        fromLng = origin.lng
+                      }
+                    }
+
+                    if (isFinite(fromLat) && isFinite(fromLng)) {
+                      const meters = haversine(
+                        { lat: fromLat, lng: fromLng },
+                        { lat: destLat, lng: destLng }
+                      )
+                      distanceKm = meters / 1000
+                      const kmh = 25 // velocidad promedio configurada
+                      const mps = Math.max(kmh, 1) * 1000 / 3600
+                      etaSeconds = meters / mps
+                    }
+                  }
+                }
+
+                const etaRaw = delivery.eta_min || delivery.eta
+                const dCreated = createdRaw ? new Date(createdRaw).toLocaleString() : '—'
+                const dStart = startRaw ? new Date(startRaw).toLocaleString() : '—'
+                const dEnd = endRaw ? new Date(endRaw).toLocaleString() : '—'
+                const dCustomerConfirmed = customerConfirmedRaw ? new Date(customerConfirmedRaw).toLocaleString() : '—'
+
+                let dEta = '—'
+                if (etaSeconds != null && isFinite(etaSeconds)) {
+                  const base = formatDuration(etaSeconds)
+                  let etaClock = ''
+                  const baseTimeRaw = startRaw || createdRaw
+                  if (baseTimeRaw) {
+                    const baseTime = new Date(baseTimeRaw)
+                    const etaDate = new Date(baseTime.getTime() + etaSeconds * 1000)
+                    etaClock = ` · aprox ${etaDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`
+                  }
+                  dEta = distanceKm != null && isFinite(distanceKm)
+                    ? `${base} (~${distanceKm.toFixed(2)} km)${etaClock}`
+                    : `${base}${etaClock}`
+                } else if (typeof etaRaw === 'number') {
+                  dEta = `${etaRaw.toFixed(1)} min`
+                } else if (etaRaw) {
+                  dEta = etaRaw
+                }
+
                 const dStaff = delivery.id_delivery || delivery.assigned_to || '—'
                 return (
                   <dl style={{ fontSize: '13px', color: '#4b5563', display: 'grid', rowGap: '.35rem', margin: 0 }}>
@@ -464,12 +564,24 @@ export default function Track() {
                       <dd style={{ margin: 0, textTransform: 'capitalize' }}>{dStatus}</dd>
                     </div>
                     <div style={{ display: 'flex', justifyContent: 'space-between', gap: '.75rem' }}>
-                      <dt style={{ fontWeight: 600 }}>Inicio</dt>
+                      <dt style={{ fontWeight: 600 }}>Pedido creado</dt>
+                      <dd style={{ margin: 0 }}>{dCreated}</dd>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', gap: '.75rem' }}>
+                      <dt style={{ fontWeight: 600 }}>Salida a reparto</dt>
                       <dd style={{ margin: 0 }}>{dStart}</dd>
                     </div>
                     <div style={{ display: 'flex', justifyContent: 'space-between', gap: '.75rem' }}>
-                      <dt style={{ fontWeight: 600 }}>Fin</dt>
+                      <dt style={{ fontWeight: 600 }}>ETA estimado</dt>
+                      <dd style={{ margin: 0 }}>{dEta}</dd>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', gap: '.75rem' }}>
+                      <dt style={{ fontWeight: 600 }}>Fin (entrega)</dt>
                       <dd style={{ margin: 0 }}>{dEnd}</dd>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', gap: '.75rem' }}>
+                      <dt style={{ fontWeight: 600 }}>Confirmación cliente</dt>
+                      <dd style={{ margin: 0 }}>{dCustomerConfirmed}</dd>
                     </div>
                     <div style={{ display: 'flex', justifyContent: 'space-between', gap: '.75rem' }}>
                       <dt style={{ fontWeight: 600 }}>Reparto / ID</dt>
