@@ -350,7 +350,7 @@ export default function Track() {
                     )
                   })()}
                 </div>
-                <div style={{ width: 180, textAlign: 'right' }}>
+                <div style={{ width: 220, textAlign: 'right', display: 'flex', flexDirection: 'column', gap: '.35rem' }}>
                   <button
                     className="btn danger"
                     style={{ width: '100%' }}
@@ -367,9 +367,33 @@ export default function Track() {
                     Cancelar pedido
                   </button>
                   {!canCancelStatus(order.status || order.estado) && (
-                    <div style={{ marginTop: '.35rem', color:'#6b7280', fontSize:'12px' }}>
+                    <div style={{ color:'#6b7280', fontSize:'12px' }}>
                       Solo se puede cancelar cuando el estado es <strong>recibido</strong>.
                     </div>
+                  )}
+
+                  {(() => {
+                    const st = String(currentStatus || rawStatus).toLowerCase()
+                    return st.includes('entregado') || st.includes('delivered')
+                  })() && (
+                    <button
+                      className="btn"
+                      style={{ width: '100%', marginTop: '.35rem' }}
+                      onClick={async e => {
+                        e.preventDefault()
+                        const oid = order.id_order || order.order_id || id
+                        if (!oid) return
+                        try {
+                          await api(`/orders/${encodeURIComponent(oid)}/customer-confirm-delivered`, { method: 'POST' })
+                          showToast({ type: 'success', message: '¡Gracias! Confirmaste que tu pedido llegó.' })
+                        } catch (err) {
+                          console.error('Error confirmando entrega por cliente:', err)
+                          showToast({ type: 'error', message: err.message || 'No se pudo registrar tu confirmación' })
+                        }
+                      }}
+                    >
+                      ✅ Confirmar que ya llegó
+                    </button>
                   )}
                 </div>
               </div>
