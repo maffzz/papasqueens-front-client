@@ -193,6 +193,8 @@ export default function Account() {
         name: name || auth.user || auth.name || auth.email,
         address: address.trim(),
         phone: phone.trim() || undefined,
+        lat: location.lat,
+        lng: location.lng,
       }
       const res = await api('/auth/customer/profile', {
         method: 'PATCH',
@@ -208,6 +210,8 @@ export default function Account() {
         tenant_id: res.tenant_id || auth.tenant_id,
         address: res.address || payload.address,
         phone: res.phone || payload.phone || '',
+        lat: res.lat ?? auth.lat ?? location.lat,
+        lng: res.lng ?? auth.lng ?? location.lng,
       }
       login(updatedAuth)
       showToast({ type: 'success', message: 'Datos actualizados correctamente.' })

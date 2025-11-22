@@ -189,8 +189,11 @@ export default function Track() {
       const stepName = String((h && h.step) || '').toLowerCase()
       return stepName.includes('aceptado') || stepName.includes('accepted')
     })
-    const hasMultipleSteps = orderDetails.history.length > 1
-    if (hasAccepted || (hasMultipleSteps && rawStatus === 'recibido')) {
+
+    // Solo escalar de "recibido" (o vacío) a "en_preparacion" si el historial lo indica,
+    // nunca bajar estados más avanzados como "listo_para_entrega", "en_camino" o "entregado".
+    const isRawEmptyOrReceived = !rawStatus || rawStatus === 'recibido'
+    if (hasAccepted && isRawEmptyOrReceived) {
       derivedStatus = 'en_preparacion'
     }
   }

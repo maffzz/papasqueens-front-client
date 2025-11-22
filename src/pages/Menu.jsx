@@ -101,6 +101,9 @@ export default function Menu() {
         qty: x.qty || 1,
       })),
       delivery_address: auth.address || auth.direccion || undefined,
+      customer_name: auth.user || auth.name || auth.email,
+      dest_lat: auth.lat,
+      dest_lng: auth.lng,
     }
     if (!payload.list_id_products.length) {
       alert('Error: No hay productos válidos en el carrito')
