@@ -92,7 +92,7 @@ export default function Home() {
               {/* Imagen de ejemplo desde el bucket de menú */}
               <div style={{ borderRadius: '.75rem', overflow: 'hidden', marginTop: '.25rem' }}>
                 <img
-                  src="https://papasqueens-menu-images.s3.amazonaws.com/combo-express-1-persona.jpg"
+                  src="https://papasqueens-menu-image.s3.amazonaws.com/combo-express-1-persona.jpg"
                   alt="Combo Papas Queen's"
                   style={{ width: '100%', height: '140px', objectFit: 'cover', display: 'block' }}
                 />
@@ -188,10 +188,10 @@ export default function Home() {
           </header>
           <div className="grid" style={{ gridTemplateColumns: 'repeat(4, minmax(0,1fr))', gap: '1rem', marginBottom: '1.75rem' }}>
             {[
-              'https://papasqueens-menu-images.s3.amazonaws.com/alitas-x-10-und.jpg',
-              'https://papasqueens-menu-images.s3.amazonaws.com/combo-express-1-persona.jpg',
-              'https://papasqueens-menu-images.s3.amazonaws.com/burger-clasica.jpg',
-              'https://papasqueens-menu-images.s3.amazonaws.com/salchiqueens-especial-premium.jpg',
+              'https://papasqueens-menu-image.s3.amazonaws.com/alitas-x-10-und.jpg',
+              'https://papasqueens-menu-image.s3.amazonaws.com/combo-express-1-persona.jpg',
+              'https://papasqueens-menu-image.s3.amazonaws.com/burger-clasica.jpg',
+              'https://papasqueens-menu-image.s3.amazonaws.com/salchiqueens-especial-premium.jpg',
             ].map((src, idx) => (
               <div
                 key={idx}
