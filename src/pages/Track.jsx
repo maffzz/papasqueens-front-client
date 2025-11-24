@@ -12,6 +12,70 @@ const TENANT_ORIGINS = {
   tenant_pq_jiron: { lat: -12.0560, lng: -77.0370 },
 }
 
+// Ícono personalizado para el delivery (repartidor)
+const deliveryIcon = L.divIcon({
+  className: 'delivery-marker',
+  html: `<div style="
+    width: 40px;
+    height: 40px;
+    background: linear-gradient(135deg, #16a34a 0%, #059669 100%);
+    border: 3px solid white;
+    border-radius: 50%;
+    box-shadow: 0 4px 12px rgba(22, 163, 74, 0.4);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 20px;
+    animation: pulse 2s infinite;
+  ">🛵</div>
+  <style>
+    @keyframes pulse {
+      0%, 100% { transform: scale(1); }
+      50% { transform: scale(1.1); }
+    }
+  </style>`,
+  iconSize: [40, 40],
+  iconAnchor: [20, 20]
+})
+
+// Ícono para el destino (casa del cliente)
+const destinationIcon = L.divIcon({
+  className: 'destination-marker',
+  html: `<div style="
+    width: 36px;
+    height: 36px;
+    background: linear-gradient(135deg, #dc2626 0%, #b91c1c 100%);
+    border: 3px solid white;
+    border-radius: 50%;
+    box-shadow: 0 4px 12px rgba(220, 38, 38, 0.4);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 18px;
+  ">🏠</div>`,
+  iconSize: [36, 36],
+  iconAnchor: [18, 18]
+})
+
+// Ícono para el origen (restaurante)
+const originIcon = L.divIcon({
+  className: 'origin-marker',
+  html: `<div style="
+    width: 36px;
+    height: 36px;
+    background: linear-gradient(135deg, #0ea5e9 0%, #0284c7 100%);
+    border: 3px solid white;
+    border-radius: 50%;
+    box-shadow: 0 4px 12px rgba(14, 165, 233, 0.4);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 18px;
+  ">🍽️</div>`,
+  iconSize: [36, 36],
+  iconAnchor: [18, 18]
+})
+
 export default function Track() {
   const [sp] = useSearchParams()
   const [order, setOrder] = useState(null)
@@ -26,6 +90,12 @@ export default function Track() {
   const polyRef = useRef(null)
   const routeRef = useRef(null)
   const lastPointRef = useRef(null)
+  const originMarkerRef = useRef(null)
+  const destinationMarkerRef = useRef(null)
+  const mockAnimationRef = useRef(null)
+  const mockRoutePointsRef = useRef([])
+  const mockCurrentIndexRef = useRef(0)
+  const [useMockRoute, setUseMockRoute] = useState(false)
   const { showToast } = useToast()
   const { auth } = useAuth()
 
@@ -72,7 +142,74 @@ export default function Track() {
 
   function onSubmit(ev) { ev.preventDefault(); if (id) fetchOrder(id) }
 
+  // Función para generar puntos intermedios en una ruta (interpolación)
+  function generateRoutePoints(start, end, numPoints = 30) {
+    const points = []
+    for (let i = 0; i <= numPoints; i++) {
+      const ratio = i / numPoints
+      // Interpolación lineal con pequeñas variaciones aleatorias para simular calles
+      const lat = start.lat + (end.lat - start.lat) * ratio + (Math.random() - 0.5) * 0.001
+      const lng = start.lng + (end.lng - start.lng) * ratio + (Math.random() - 0.5) * 0.001
+      points.push({ lat, lng })
+    }
+    return points
+  }
+
+  // Función para iniciar la animación mock del delivery
+  function startMockAnimation() {
+    const tenantId = getTenantId()
+    const origin = TENANT_ORIGINS[tenantId]
+    const destLatRaw = orderDetails && (orderDetails.dest_lat ?? orderDetails.destLat)
+    const destLngRaw = orderDetails && (orderDetails.dest_lng ?? orderDetails.destLng)
+    const destLat = destLatRaw != null ? Number(destLatRaw) : null
+    const destLng = destLngRaw != null ? Number(destLngRaw) : null
+
+    if (!origin || !isFinite(destLat) || !isFinite(destLng)) {
+      console.log('No se puede iniciar seguimiento: falta origen o destino')
+      return
+    }
+
+    // Generar ruta mock con más puntos para movimiento más suave
+    mockRoutePointsRef.current = generateRoutePoints(origin, { lat: destLat, lng: destLng }, 60)
+    mockCurrentIndexRef.current = 0
+    setUseMockRoute(true)
+
+    // Limpiar animación anterior si existe
+    if (mockAnimationRef.current) {
+      clearInterval(mockAnimationRef.current)
+    }
+
+    // Animar el movimiento (actualizar cada 2 segundos)
+    mockAnimationRef.current = setInterval(() => {
+      if (mockCurrentIndexRef.current < mockRoutePointsRef.current.length - 1) {
+        mockCurrentIndexRef.current++
+        const currentPoints = mockRoutePointsRef.current.slice(0, mockCurrentIndexRef.current + 1)
+        renderTrack({ points: currentPoints })
+      } else {
+        // Llegó al destino
+        clearInterval(mockAnimationRef.current)
+        mockAnimationRef.current = null
+        showToast({ type: 'success', message: '🎉 ¡Tu pedido ha llegado!' })
+      }
+    }, 1500) // Actualizar cada 1.5 segundos para que sea más fluido
+  }
+
+  // Función para detener la animación mock
+  function stopMockAnimation() {
+    if (mockAnimationRef.current) {
+      clearInterval(mockAnimationRef.current)
+      mockAnimationRef.current = null
+    }
+    setUseMockRoute(false)
+    mockRoutePointsRef.current = []
+    mockCurrentIndexRef.current = 0
+    renderTrack({ points: [] })
+  }
+
   async function fetchTrack(idDel) {
+    // Si está en modo mock, no hacer fetch real
+    if (useMockRoute) return
+
     try {
       console.log('Consultando tracking para delivery:', idDel)
       const data = await api(`/delivery/${encodeURIComponent(idDel)}/track`)
@@ -146,30 +283,26 @@ export default function Track() {
 
   function renderTrack(t) {
     const wrap = document.getElementById('cust-track-view')
-    if (!t) { wrap.innerHTML = '<div className="card">Sin datos</div>'; return }
+    if (!t) { 
+      if (wrap) wrap.innerHTML = '<div style="padding: 1rem; text-align: center; color: #9ca3af;">Sin datos de seguimiento</div>'
+      return 
+    }
     const points = Array.isArray(t) ? t : (t.points || [])
     const validPoints = points.filter(p => p && typeof p.lat === 'number' && isFinite(p.lat) && typeof p.lng === 'number' && isFinite(p.lng))
     const last = validPoints[validPoints.length - 1] || null
     lastPointRef.current = last
-    wrap.innerHTML = `<div class="card"><div><strong>Ruta del repartidor</strong></div></div>`
 
+    // Inicializar mapa si no existe
     if (!mapRef.current) {
       mapRef.current = L.map('cust-map').setView(last ? [last.lat, last.lng] : [-12.0464, -77.0428], 13)
-      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '&copy; OpenStreetMap' }).addTo(mapRef.current)
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { 
+        maxZoom: 19, 
+        attribution: '&copy; OpenStreetMap' 
+      }).addTo(mapRef.current)
     }
     const map = mapRef.current
-    const latlngs = validPoints.map(p => [p.lat, p.lng])
-    if (polyRef.current) { map.removeLayer(polyRef.current); polyRef.current = null }
-    if (latlngs.length) {
-      polyRef.current = L.polyline(latlngs, { color: '#03592e' }).addTo(map)
-      map.fitBounds(polyRef.current.getBounds(), { padding: [20, 20] })
-    }
-    if (markerRef.current) { map.removeLayer(markerRef.current); markerRef.current = null }
-    if (last && typeof last.lat === 'number' && typeof last.lng === 'number') {
-      markerRef.current = L.marker([last.lat, last.lng]).addTo(map)
-    }
 
-    // Línea origen–destino (local -> dirección del cliente), igual que en Delivery (staff)
+    // Obtener coordenadas de origen y destino
     const tenantId = getTenantId()
     const origin = TENANT_ORIGINS[tenantId]
     const destLatRaw = orderDetails && (orderDetails.dest_lat ?? orderDetails.destLat)
@@ -177,20 +310,160 @@ export default function Track() {
     const destLat = destLatRaw != null ? Number(destLatRaw) : null
     const destLng = destLngRaw != null ? Number(destLngRaw) : null
 
+    // Marcador de origen (restaurante)
+    if (origin) {
+      if (originMarkerRef.current) {
+        originMarkerRef.current.setLatLng([origin.lat, origin.lng])
+      } else {
+        originMarkerRef.current = L.marker([origin.lat, origin.lng], { icon: originIcon })
+          .bindPopup('<strong>🍽️ Restaurante</strong><br/>Punto de origen')
+          .addTo(map)
+      }
+    }
+
+    // Marcador de destino (casa del cliente)
+    if (isFinite(destLat) && isFinite(destLng)) {
+      if (destinationMarkerRef.current) {
+        destinationMarkerRef.current.setLatLng([destLat, destLng])
+      } else {
+        destinationMarkerRef.current = L.marker([destLat, destLng], { icon: destinationIcon })
+          .bindPopup('<strong>🏠 Tu ubicación</strong><br/>Destino de entrega')
+          .addTo(map)
+      }
+    }
+
+    // Línea de ruta planificada (origen -> destino)
     if (origin && isFinite(destLat) && isFinite(destLng)) {
       const routeLatLngs = [
         [origin.lat, origin.lng],
         [destLat, destLng],
       ]
-      if (routeRef.current) { map.removeLayer(routeRef.current); routeRef.current = null }
-      routeRef.current = L.polyline(routeLatLngs, { color: '#0ea5e9', dashArray: '6 4' }).addTo(map)
-      // Si aún no hay puntos de tracking, ajustamos vista a la ruta origen-destino
-      if (!latlngs.length) {
-        map.fitBounds(routeRef.current.getBounds(), { padding: [20, 20] })
+      if (routeRef.current) {
+        routeRef.current.setLatLngs(routeLatLngs)
+      } else {
+        routeRef.current = L.polyline(routeLatLngs, { 
+          color: '#94a3b8', 
+          dashArray: '8 6',
+          weight: 3,
+          opacity: 0.6
+        }).addTo(map)
       }
-    } else if (routeRef.current) {
-      map.removeLayer(routeRef.current)
-      routeRef.current = null
+    }
+
+    // Ruta recorrida por el delivery (tracking real)
+    const latlngs = validPoints.map(p => [p.lat, p.lng])
+    if (polyRef.current) {
+      if (latlngs.length) {
+        polyRef.current.setLatLngs(latlngs)
+      } else {
+        map.removeLayer(polyRef.current)
+        polyRef.current = null
+      }
+    } else if (latlngs.length) {
+      polyRef.current = L.polyline(latlngs, { 
+        color: '#16a34a',
+        weight: 4,
+        opacity: 0.8
+      }).addTo(map)
+    }
+
+    // Marcador del delivery (posición actual del repartidor) con animación suave
+    if (markerRef.current) {
+      if (last && typeof last.lat === 'number' && typeof last.lng === 'number') {
+        // Animación suave del marcador
+        const currentLatLng = markerRef.current.getLatLng()
+        const newLatLng = L.latLng(last.lat, last.lng)
+        
+        // Si la distancia es pequeña, animar suavemente
+        const distance = currentLatLng.distanceTo(newLatLng)
+        if (distance < 1000 && useMockRoute) { // Solo animar en modo mock y distancias cortas
+          // Animación con pasos intermedios
+          let step = 0
+          const steps = 20
+          const latStep = (newLatLng.lat - currentLatLng.lat) / steps
+          const lngStep = (newLatLng.lng - currentLatLng.lng) / steps
+          
+          const animate = () => {
+            if (step < steps && markerRef.current) {
+              step++
+              const intermediateLat = currentLatLng.lat + latStep * step
+              const intermediateLng = currentLatLng.lng + lngStep * step
+              markerRef.current.setLatLng([intermediateLat, intermediateLng])
+              requestAnimationFrame(animate)
+            }
+          }
+          requestAnimationFrame(animate)
+        } else {
+          markerRef.current.setLatLng([last.lat, last.lng])
+        }
+      } else {
+        map.removeLayer(markerRef.current)
+        markerRef.current = null
+      }
+    } else if (last && typeof last.lat === 'number' && typeof last.lng === 'number') {
+      markerRef.current = L.marker([last.lat, last.lng], { icon: deliveryIcon })
+        .bindPopup('<strong>🛵 Repartidor</strong><br/>Posición actual')
+        .addTo(map)
+    }
+
+    // Ajustar vista del mapa
+    const allPoints = []
+    if (origin) allPoints.push([origin.lat, origin.lng])
+    if (isFinite(destLat) && isFinite(destLng)) allPoints.push([destLat, destLng])
+    if (latlngs.length) allPoints.push(...latlngs)
+    
+    if (allPoints.length > 0) {
+      const bounds = L.latLngBounds(allPoints)
+      map.fitBounds(bounds, { padding: [50, 50], maxZoom: 15 })
+    }
+
+    // Actualizar info de tracking
+    if (wrap) {
+      const distanceText = last && isFinite(destLat) && isFinite(destLng) 
+        ? `${(haversine(last, { lat: destLat, lng: destLng }) / 1000).toFixed(2)} km`
+        : '—'
+      
+      // Calcular progreso si está en modo mock
+      let progressPercent = 0
+      let etaMinutes = '—'
+      if (useMockRoute && mockRoutePointsRef.current.length > 0) {
+        progressPercent = Math.round((mockCurrentIndexRef.current / (mockRoutePointsRef.current.length - 1)) * 100)
+        const remainingPoints = mockRoutePointsRef.current.length - mockCurrentIndexRef.current
+        etaMinutes = Math.ceil((remainingPoints * 2) / 60) // 2 segundos por punto
+      }
+      
+      wrap.innerHTML = `
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-bottom: 1rem;">
+          <div style="background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%); padding: 1rem; border-radius: 0.75rem; border: 1px solid #bbf7d0; position: relative; overflow: hidden;">
+            ${useMockRoute ? `<div style="position: absolute; bottom: 0; left: 0; height: 4px; background: #16a34a; width: ${progressPercent}%; transition: width 0.5s ease;"></div>` : ''}
+            <div style="font-size: 12px; color: #166534; font-weight: 600; margin-bottom: 0.25rem;">POSICIÓN DEL REPARTIDOR</div>
+            <div style="font-size: 20px; font-weight: 700; color: #16a34a;">
+              ${last ? '🛵 En movimiento' : '⏳ Esperando...'}
+            </div>
+            <div style="font-size: 11px; color: #15803d; margin-top: 0.25rem;">
+              ${last ? `Última actualización: ${new Date().toLocaleTimeString()}` : 'Sin señal GPS aún'}
+            </div>
+          </div>
+          <div style="background: linear-gradient(135deg, #fef2f2 0%, #fee2e2 100%); padding: 1rem; border-radius: 0.75rem; border: 1px solid #fecaca;">
+            <div style="font-size: 12px; color: #991b1b; font-weight: 600; margin-bottom: 0.25rem;">DISTANCIA RESTANTE</div>
+            <div style="font-size: 20px; font-weight: 700; color: #dc2626;">
+              ${distanceText}
+            </div>
+            <div style="font-size: 11px; color: #b91c1c; margin-top: 0.25rem;">
+              Hasta tu ubicación
+            </div>
+          </div>
+          <div style="background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%); padding: 1rem; border-radius: 0.75rem; border: 1px solid #bfdbfe;">
+            <div style="font-size: 12px; color: #1e40af; font-weight: 600; margin-bottom: 0.25rem;">${useMockRoute ? 'PROGRESO' : 'PUNTOS DE TRACKING'}</div>
+            <div style="font-size: 20px; font-weight: 700; color: #2563eb;">
+              ${useMockRoute ? `${progressPercent}%` : validPoints.length}
+            </div>
+            <div style="font-size: 11px; color: #1d4ed8; margin-top: 0.25rem;">
+              ${useMockRoute ? `ETA: ~${etaMinutes} min` : 'Actualizaciones GPS recibidas'}
+            </div>
+          </div>
+        </div>
+      `
     }
   }
 
@@ -207,12 +480,57 @@ export default function Track() {
     if (etaEl) etaEl.textContent = `ETA ~ ${formatDuration(seconds)} (distancia ${(meters/1000).toFixed(2)} km)`
   }
 
+  // Efecto para iniciar automáticamente la simulación si no hay tracking real
   useEffect(() => {
-    if (!deliveryId) return
+    if (!orderDetails || useMockRoute) return
+    
+    // Esperar un momento para intentar obtener tracking real
+    const checkTimer = setTimeout(async () => {
+      if (deliveryId) {
+        try {
+          const data = await api(`/delivery/${encodeURIComponent(deliveryId)}/track`)
+          const hasRealTracking = data && (
+            (Array.isArray(data) && data.length > 0) ||
+            (data.points && data.points.length > 0) ||
+            (data.lat !== undefined && data.lon !== undefined)
+          )
+          
+          // Si no hay tracking real, iniciar simulación automáticamente
+          if (!hasRealTracking) {
+            console.log('No hay tracking real, iniciando simulación automática...')
+            startMockAnimation()
+          }
+        } catch (e) {
+          // Si hay error obteniendo tracking, iniciar simulación
+          console.log('Error obteniendo tracking, iniciando simulación automática...')
+          startMockAnimation()
+        }
+      } else {
+        // Si no hay deliveryId pero hay orderDetails, iniciar simulación
+        const destLatRaw = orderDetails.dest_lat ?? orderDetails.destLat
+        const destLngRaw = orderDetails.dest_lng ?? orderDetails.destLng
+        if (destLatRaw != null && destLngRaw != null) {
+          console.log('Iniciando simulación automática con destino del pedido...')
+          startMockAnimation()
+        }
+      }
+    }, 2000) // Esperar 2 segundos antes de verificar
+    
+    return () => clearTimeout(checkTimer)
+  }, [orderDetails])
+
+  useEffect(() => {
+    if (!deliveryId || useMockRoute) return
     const t = setInterval(() => fetchTrack(deliveryId), 10000)
     fetchTrack(deliveryId)
-    return () => clearInterval(t)
-  }, [deliveryId])
+    return () => {
+      clearInterval(t)
+      // Limpiar animación mock al desmontar
+      if (mockAnimationRef.current) {
+        clearInterval(mockAnimationRef.current)
+      }
+    }
+  }, [deliveryId, useMockRoute])
 
   const steps = ['recibido', 'en_preparacion', 'listo_para_entrega', 'en_camino', 'entregado']
   const rawStatus = String(order?.status || order?.estado || '').toLowerCase()
@@ -281,28 +599,59 @@ export default function Track() {
         {/* Estado actual del pedido */}
         {order && (
           <div className="section" style={{ paddingTop: 0 }}>
-            <div className="card" style={{ padding: '1.5rem 1.75rem', borderRadius: '1rem', boxShadow: '0 10px 25px rgba(15,23,42,0.06)', marginBottom: '1.5rem' }}>
-              <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', gap: '1rem', marginBottom: '1rem' }}>
-                <div>
-                  <div style={{ fontSize: '13px', color: '#6b7280' }}>Pedido</div>
-                  <div style={{ fontWeight: 700, color: '#03592e' }}>#{order.id_order || order.order_id || order.id}</div>
+            <div className="card" style={{ 
+              padding: '2rem', 
+              borderRadius: '1.25rem', 
+              boxShadow: '0 20px 40px rgba(15,23,42,0.1)',
+              background: 'linear-gradient(135deg, #ffffff 0%, #f9fafb 100%)',
+              border: '1px solid #e5e7eb',
+              marginBottom: '1.5rem' 
+            }}>
+              <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', gap: '1.5rem', marginBottom: '1.5rem', flexWrap: 'wrap' }}>
+                <div style={{ flex: 1, minWidth: '200px' }}>
+                  <div style={{ fontSize: '12px', color: '#9ca3af', fontWeight: 600, letterSpacing: '0.05em', marginBottom: '.35rem' }}>PEDIDO</div>
+                  <div style={{ 
+                    fontWeight: 800, 
+                    color: '#03592e', 
+                    fontSize: '28px',
+                    letterSpacing: '-0.02em'
+                  }}>
+                    #{order.id_order || order.order_id || order.id}
+                  </div>
                 </div>
-                <div style={{ textAlign: 'right' }}>
-                  <div style={{ fontSize: '13px', color: '#6b7280' }}>Monto</div>
+                <div style={{ textAlign: 'right', flex: 1, minWidth: '200px' }}>
+                  <div style={{ fontSize: '12px', color: '#9ca3af', fontWeight: 600, letterSpacing: '0.05em', marginBottom: '.35rem' }}>MONTO TOTAL</div>
                   {Number(order.total || 0) === 0 ? (
-                    <div style={{ fontWeight: 700, color: '#16a34a' }}>Pagado</div>
+                    <div style={{ 
+                      fontWeight: 800, 
+                      color: '#16a34a',
+                      fontSize: '28px',
+                      letterSpacing: '-0.02em'
+                    }}>
+                      ✓ Pagado
+                    </div>
                   ) : (
-                    <div style={{ fontWeight: 700, color: '#03592e' }}>{formatPrice(order.total || 0)}</div>
+                    <div style={{ 
+                      fontWeight: 800, 
+                      color: '#03592e',
+                      fontSize: '28px',
+                      letterSpacing: '-0.02em'
+                    }}>
+                      {formatPrice(order.total || 0)}
+                    </div>
                   )}
-                  <div style={{ marginTop: '.35rem' }}>
+                  <div style={{ marginTop: '.75rem' }}>
                     <span style={{
-                      fontSize: '11px',
-                      padding: '.15rem .55rem',
+                      fontSize: '12px',
+                      padding: '.4rem .9rem',
                       borderRadius: '999px',
-                      border: '1px solid #16a34a',
+                      border: '2px solid #16a34a',
                       color: '#166534',
-                      background: '#dcfce7',
-                      textTransform: 'capitalize'
+                      background: 'linear-gradient(135deg, #dcfce7 0%, #bbf7d0 100%)',
+                      textTransform: 'capitalize',
+                      fontWeight: 700,
+                      display: 'inline-block',
+                      boxShadow: '0 2px 8px rgba(22, 163, 74, 0.2)'
                     }}>
                       {(currentStatus || rawStatus || 'desconocido').replace(/_/g, ' ')}
                     </span>
@@ -310,49 +659,83 @@ export default function Track() {
                 </div>
               </div>
 
-              {/* Barra de progreso visual */}
-              <div style={{ margin: '1rem 0 1.25rem' }}>
-                <div style={{ display:'flex', justifyContent:'space-between', marginBottom: '.35rem' }}>
+              {/* Barra de progreso visual mejorada */}
+              <div style={{ 
+                margin: '1.5rem 0 2rem',
+                padding: '1.5rem',
+                background: 'white',
+                borderRadius: '1rem',
+                boxShadow: '0 4px 12px rgba(0,0,0,0.05)'
+              }}>
+                <div style={{ display:'flex', justifyContent:'space-between', marginBottom: '1rem', position: 'relative' }}>
+                  {/* Línea de conexión entre pasos */}
+                  <div style={{
+                    position: 'absolute',
+                    top: '18px',
+                    left: '10%',
+                    right: '10%',
+                    height: '4px',
+                    background: '#e5e7eb',
+                    borderRadius: '999px',
+                    zIndex: 0
+                  }}>
+                    <div style={{
+                      height: '100%',
+                      background: 'linear-gradient(90deg, #16a34a 0%, #22c55e 100%)',
+                      borderRadius: '999px',
+                      width: currentStepIndex === -1 ? '0%' : `${(currentStepIndex / (steps.length - 1)) * 100}%`,
+                      transition: 'width 0.5s ease'
+                    }} />
+                  </div>
+                  
                   {steps.map((step, idx) => {
                     const isDone = currentStepIndex >= idx && currentStepIndex !== -1
+                    const isCurrent = currentStepIndex === idx
                     const label = step.replace(/_/g, ' ')
+                    const emojis = ['📝', '👨‍🍳', '📦', '🛵', '✅']
+                    
                     return (
-                      <div key={step} style={{ flex: 1, textAlign:'center', fontSize: '11px', color: isDone ? '#065f46' : '#9ca3af' }}>
+                      <div key={step} style={{ 
+                        flex: 1, 
+                        textAlign:'center', 
+                        fontSize: '11px', 
+                        color: isDone ? '#065f46' : '#9ca3af',
+                        position: 'relative',
+                        zIndex: 1
+                      }}>
                         <div
                           style={{
-                            width: 18,
-                            height: 18,
+                            width: isCurrent ? 44 : 36,
+                            height: isCurrent ? 44 : 36,
                             borderRadius: '999px',
-                            margin: '0 auto .25rem',
-                            border: '2px solid ' + (isDone ? '#16a34a' : '#d1d5db'),
-                            background: isDone ? '#16a34a' : '#f9fafb',
+                            margin: '0 auto .5rem',
+                            border: `3px solid ${isDone ? '#16a34a' : '#d1d5db'}`,
+                            background: isDone 
+                              ? 'linear-gradient(135deg, #16a34a 0%, #22c55e 100%)' 
+                              : 'white',
                             display:'flex',
                             alignItems:'center',
                             justifyContent:'center',
-                            color: '#fff',
-                            fontSize: '11px',
-                            fontWeight: 600
+                            fontSize: isCurrent ? '18px' : '16px',
+                            fontWeight: 700,
+                            boxShadow: isDone ? '0 4px 12px rgba(22, 163, 74, 0.3)' : '0 2px 4px rgba(0,0,0,0.1)',
+                            transition: 'all 0.3s ease',
+                            transform: isCurrent ? 'scale(1.1)' : 'scale(1)'
                           }}
                         >
-                          {idx + 1}
+                          {isDone ? '✓' : emojis[idx]}
                         </div>
-                        <span style={{ textTransform:'capitalize' }}>{label}</span>
+                        <div style={{ 
+                          textTransform:'capitalize',
+                          fontWeight: isCurrent ? 700 : 600,
+                          fontSize: isCurrent ? '12px' : '11px',
+                          lineHeight: '1.3'
+                        }}>
+                          {label}
+                        </div>
                       </div>
                     )
                   })}
-                </div>
-                <div style={{ position:'relative', height: 3, background:'#e5e7eb', borderRadius: 999 }}>
-                  <div
-                    style={{
-                      position:'absolute',
-                      left: 0,
-                      top: 0,
-                      bottom: 0,
-                      borderRadius: 999,
-                      background:'#16a34a',
-                      width: currentStepIndex === -1 ? '0%' : `${(currentStepIndex / (steps.length - 1)) * 100}%`
-                    }}
-                  />
                 </div>
               </div>
 
@@ -444,8 +827,23 @@ export default function Track() {
             alignItems: 'stretch'
           }}
         >
-          <div className="card" style={{ borderRadius: '1rem', height: '100%', padding: '1.25rem 1.5rem' }}>
-            <h2 className="appTitle" style={{ marginBottom: '.75rem', fontSize: '17px' }}>Historial del pedido</h2>
+          <div className="card" style={{ 
+            borderRadius: '1rem', 
+            height: '100%', 
+            padding: '1.5rem',
+            boxShadow: '0 10px 25px rgba(15,23,42,0.08)',
+            background: 'linear-gradient(135deg, #ffffff 0%, #f9fafb 100%)'
+          }}>
+            <h2 className="appTitle" style={{ 
+              marginBottom: '1rem', 
+              fontSize: '18px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '.5rem'
+            }}>
+              <span style={{ fontSize: '20px' }}>📋</span>
+              Historial del pedido
+            </h2>
             {!orderDetails ? (
               <div style={{ fontSize: '13px', color: '#9ca3af' }}>—</div>
             ) : (
@@ -479,8 +877,23 @@ export default function Track() {
             )}
           </div>
 
-          <div className="card" style={{ borderRadius: '1rem', height: '100%', padding: '1.25rem 1.5rem' }}>
-            <h2 className="appTitle" style={{ marginBottom: '.75rem', fontSize: '17px' }}>Detalle del delivery</h2>
+          <div className="card" style={{ 
+            borderRadius: '1rem', 
+            height: '100%', 
+            padding: '1.5rem',
+            boxShadow: '0 10px 25px rgba(15,23,42,0.08)',
+            background: 'linear-gradient(135deg, #ffffff 0%, #f9fafb 100%)'
+          }}>
+            <h2 className="appTitle" style={{ 
+              marginBottom: '1rem', 
+              fontSize: '18px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '.5rem'
+            }}>
+              <span style={{ fontSize: '20px' }}>🚚</span>
+              Detalle del delivery
+            </h2>
             {!orderDetails ? (
               <div style={{ fontSize: '13px', color: '#9ca3af' }}>—</div>
             ) : (
@@ -596,13 +1009,60 @@ export default function Track() {
       </section>
 
       <section className="section">
-        <div className="card">
-          <h2 className="appTitle" style={{ marginBottom: '.5rem' }}>Seguimiento del repartidor</h2>
-          <p style={{ fontSize: '13px', color: '#6b7280', marginBottom: '.75rem' }}>
-            Cuando tu pedido esté en camino verás aquí la ruta aproximada del repartidor.
-          </p>
-          <div id="cust-track-view" className="list" style={{ marginBottom: '.75rem' }}></div>
-          <div id="cust-map" className="map"></div>
+        <div className="card" style={{ padding: '1.5rem', borderRadius: '1rem', boxShadow: '0 10px 25px rgba(15,23,42,0.08)' }}>
+          <div style={{ marginBottom: '1.25rem' }}>
+            <h2 className="appTitle" style={{ marginBottom: '.5rem', fontSize: '20px', display: 'flex', alignItems: 'center', gap: '.5rem' }}>
+              <span style={{ fontSize: '24px' }}>📍</span>
+              Seguimiento en tiempo real
+            </h2>
+            <p style={{ fontSize: '13px', color: '#6b7280', margin: 0 }}>
+              Mira la ubicación actual de tu repartidor y la ruta que está siguiendo hasta tu dirección.
+            </p>
+          </div>
+          
+          <div id="cust-track-view" style={{ marginBottom: '1rem' }}></div>
+          
+          <div style={{ position: 'relative', borderRadius: '0.75rem', overflow: 'hidden', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}>
+            <div id="cust-map" className="map" style={{ height: '500px', borderRadius: '0.75rem' }}></div>
+            
+            {/* Leyenda del mapa */}
+            <div style={{
+              position: 'absolute',
+              bottom: '1rem',
+              left: '1rem',
+              background: 'rgba(255, 255, 255, 0.95)',
+              backdropFilter: 'blur(8px)',
+              padding: '0.75rem 1rem',
+              borderRadius: '0.75rem',
+              boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+              fontSize: '12px',
+              zIndex: 1000
+            }}>
+              <div style={{ fontWeight: 700, marginBottom: '0.5rem', color: '#1f2937' }}>Leyenda</div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <span style={{ fontSize: '16px' }}>🛵</span>
+                  <span style={{ color: '#16a34a', fontWeight: 600 }}>Repartidor (posición actual)</span>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <span style={{ fontSize: '16px' }}>🏠</span>
+                  <span style={{ color: '#dc2626', fontWeight: 600 }}>Tu ubicación</span>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <span style={{ fontSize: '16px' }}>🍽️</span>
+                  <span style={{ color: '#0ea5e9', fontWeight: 600 }}>Restaurante</span>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginTop: '0.25rem', paddingTop: '0.35rem', borderTop: '1px solid #e5e7eb' }}>
+                  <div style={{ width: '20px', height: '3px', background: '#16a34a', borderRadius: '2px' }}></div>
+                  <span style={{ color: '#4b5563' }}>Ruta recorrida</span>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <div style={{ width: '20px', height: '2px', background: '#94a3b8', borderRadius: '2px', borderTop: '2px dashed #94a3b8' }}></div>
+                  <span style={{ color: '#4b5563' }}>Ruta planificada</span>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       </section>
   </main>

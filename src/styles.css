@@ -154,3 +154,79 @@ body {
   border-radius: var(--radius);
   overflow: hidden;
 }
+
+/* Animaciones para marcadores del mapa */
+@keyframes pulse {
+  0%, 100% {
+    transform: scale(1);
+    opacity: 1;
+    box-shadow: 0 4px 12px rgba(22, 163, 74, 0.4);
+  }
+  50% {
+    transform: scale(1.15);
+    opacity: 0.9;
+    box-shadow: 0 6px 20px rgba(22, 163, 74, 0.6);
+  }
+}
+
+@keyframes bounce {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-5px);
+  }
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.delivery-marker {
+  animation: fadeIn 0.5s ease-out;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.destination-marker,
+.origin-marker {
+  animation: fadeIn 0.5s ease-out, bounce 2s ease-in-out infinite;
+}
+
+/* Estilos para los popups de Leaflet */
+.leaflet-popup-content-wrapper {
+  border-radius: 0.75rem;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.15);
+  font-family: 'CircularStd-Book', sans-serif;
+}
+
+.leaflet-popup-content {
+  margin: 0.75rem;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.leaflet-popup-tip {
+  box-shadow: 0 3px 14px rgba(0, 0, 0, 0.1);
+}
+
+/* Mejoras visuales para botones deshabilitados */
+.btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.btn:disabled:hover {
+  filter: none;
+}
+
+/* Transiciones suaves */
+* {
+  transition: opacity 0.2s ease, transform 0.2s ease;
+}
