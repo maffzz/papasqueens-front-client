@@ -1,6 +1,6 @@
 # Papas Queen's - Frontend Cliente 🥔👑
 
-Este proyecto es el **frontend de clientes** de Papas Queen's, construido con **React + Vite**. Permite que los clientes naveguen el menú, armen su carrito, creen pedidos y hagan seguimiento en tiempo real. 🚀
+Este proyecto es el **frontend de clientes** de Papas Queen's, construido con **React + Vite**. Permite que los clientes naveguen el menú, armen su carrito, creen pedidos y consulten el estado de sus pedidos. 🚀
 
 ---
 
@@ -138,8 +138,9 @@ Arquitectura SPA basada en rutas definidas en `src/App.jsx`.
   - Consulta `GET /orders/customer/{id_customer}` y/o `GET /orders/{id_order}/status`.
 
 - **`/track` – Seguimiento (`Track.jsx`)** 📍
-  - Permite ver el estado y tracking de un pedido activo.
-  - Usa información expuesta por el backend (estado del pedido, tiempos estimados, etc.).
+  - Permite ver el estado de un pedido activo.
+  - Muestra el historial del pedido y detalles del delivery.
+  - Permite cancelar pedidos en estado "recibido" y confirmar entrega.
 
 - **`/account` – Mi cuenta (`Account.jsx`)** 🙋‍♀️
   - Muestra y permite editar datos básicos del cliente.
